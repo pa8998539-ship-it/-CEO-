@@ -1,90 +1,92 @@
 const axios = require("axios");
-const simsim = "https://api.cyber-ninjas.top";
+const simsim = "https://simsimi.cyberbot.top";
 
 module.exports = {
   config: {
     name: "baby",
-    version: "2.0.0",
-    author: "rX",
+    version: "1.0.3",
+    author: "ULLASH (Modified By Mehedi) ",
     countDown: 0,
     role: 0,
-    shortDescription: "Cute AI Baby Chatbot (Auto Teach + Typing)",
-    longDescription: "Talk & Chat with Emotion — Auto teach enabled with typing effect.",
+    shortDescription: "Cute AI Baby Chatbot",
+    longDescription: "Talk, Teach & Chat with Emotion — Baby AI chatbot powered by SimSimi API",
     category: "fun",
     guide: {
-      en: "{p}baby [message]\n{p}baby teach [Question] - [Answer]\n{p}baby list"
+      en: "{p}baby [message]\n{p}baby teach [Question] - [Answer]\n{p}baby edit [Question] - [OldReply] - [NewReply]\n{p}baby remove [Question] - [Reply]\n{p}baby list"
     }
   },
 
   // ─────────────── MAIN COMMAND ───────────────
   onStart: async function ({ api, event, args, message, usersData }) {
-    const senderID = event.senderID;
-    const senderName = await usersData.getName(senderID);
-    const query = args.join(" ").trim().toLowerCase();
-    const threadID = event.threadID;
-    const messageID = event.messageID;
-
-    // --- Typing System ---
-    const sendTyping = async () => {
-      try {
-        if (typeof api.sendTypingIndicatorV2 === "function") {
-          await api.sendTypingIndicatorV2(true, threadID);
-          await new Promise(r => setTimeout(r, 3000));
-          await api.sendTypingIndicatorV2(false, threadID);
-        } else {
-          console.error("❌ Typing unsupported: sendTypingIndicatorV2 not found");
-        }
-      } catch (err) {
-        console.error("❌ Typing error:", err.message);
-      }
-    };
-
     try {
+      const senderID = event.senderID;
+      const senderName = await usersData.getName(senderID);
+      const query = args.join(" ").toLowerCase();
+
       if (!query) {
-        await sendTyping();
-        const ran = ["Bolo baby 💖", "Hea baby 😚"];
+        const ran = ["Bolo baby", "hum"];
         const r = ran[Math.floor(Math.random() * ran.length)];
         return message.reply(r, (err, info) => {
           if (!err) {
-            global.GoatBot.onReply.set(info.messageID, { commandName: "baby", author: senderID });
+            global.GoatBot.onReply.set(info.messageID, {
+              commandName: "baby",
+              author: senderID
+            });
           }
         });
       }
 
-      // ─── Teach command ───
+      // remove
+      if (["remove", "rm"].includes(args[0])) {
+        const parts = query.replace(/^(remove|rm)\s*/, "").split(" - ");
+        if (parts.length < 2)
+          return message.reply("Use: baby remove [Question] - [Reply]");
+        const [ask, ans] = parts;
+        const res = await axios.get(`${simsim}/delete?ask=${encodeURIComponent(ask)}&ans=${encodeURIComponent(ans)}`);
+        return message.reply(res.data.message);
+      }
+
+      // list
+      if (args[0] === "list") {
+        const res = await axios.get(`${simsim}/list`);
+        if (res.data.code === 200)
+          return message.reply(`♾ Total Questions: ${res.data.totalQuestions}\n★ Replies: ${res.data.totalReplies}\n☠︎︎ Developer: ${res.data.author}`);
+        else
+          return message.reply(`Error: ${res.data.message || "Failed to fetch list"}`);
+      }
+
+      // edit
+      if (args[0] === "edit") {
+        const parts = query.replace("edit ", "").split(" - ");
+        if (parts.length < 3)
+          return message.reply("Use: baby edit [Question] - [OldReply] - [NewReply]");
+        const [ask, oldReply, newReply] = parts;
+        const res = await axios.get(`${simsim}/edit?ask=${encodeURIComponent(ask)}&old=${encodeURIComponent(oldReply)}&new=${encodeURIComponent(newReply)}`);
+        return message.reply(res.data.message);
+      }
+
+      // teach
       if (args[0] === "teach") {
         const parts = query.replace("teach ", "").split(" - ");
         if (parts.length < 2)
           return message.reply("Use: baby teach [Question] - [Reply]");
         const [ask, ans] = parts;
-        const res = await axios.get(`${simsim}/teach?ask=${encodeURIComponent(ask)}&ans=${encodeURIComponent(ans)}&senderName=${encodeURIComponent(senderName)}`);
-        return message.reply(res.data.message || "Learned successfully!");
+        const res = await axios.get(`${simsim}/teach?ask=${encodeURIComponent(ask)}&ans=${encodeURIComponent(ans)}&senderID=${senderID}&senderName=${encodeURIComponent(senderName)}`);
+        return message.reply(res.data.message || "Reply added successfully!");
       }
 
-      // ─── List command ───
-      if (args[0] === "list") {
-        const res = await axios.get(`${simsim}/list`);
-        if (res.data.code === 200)
-          return message.reply(`♾ Total Questions: ${res.data.totalQuestions}\n★ Replies: ${res.data.totalReplies}\n👑 Author: ${res.data.author}`);
-        else
-          return message.reply(`Error: ${res.data.message || "Failed to fetch list"}`);
-      }
-
-      // ─── Normal chat ───
-      await sendTyping();
+      // normal message
       const res = await axios.get(`${simsim}/simsimi?text=${encodeURIComponent(query)}&senderName=${encodeURIComponent(senderName)}`);
       const responses = Array.isArray(res.data.response) ? res.data.response : [res.data.response];
-      if (!responses || responses.length === 0) {
-        console.log(`🤖 Auto-teaching new phrase: "${query}"`);
-        await axios.get(`${simsim}/teach?ask=${encodeURIComponent(query)}&ans=${encodeURIComponent("hmm baby 😚 (auto learned)")}&senderName=${encodeURIComponent(senderName)}`);
-        return message.reply("hmm baby 😚");
-      }
 
       for (const reply of responses) {
         await new Promise((resolve) => {
           message.reply(reply, (err, info) => {
             if (!err) {
-              global.GoatBot.onReply.set(info.messageID, { commandName: "baby", author: senderID });
+              global.GoatBot.onReply.set(info.messageID, {
+                commandName: "baby",
+                author: senderID
+              });
             }
             resolve();
           });
@@ -92,49 +94,29 @@ module.exports = {
       }
 
     } catch (err) {
-      console.error("❌ Baby main error:", err);
+      console.error(err);
       message.reply(`Error in baby command: ${err.message}`);
     }
   },
 
   // ─────────────── HANDLE REPLY ───────────────
   onReply: async function ({ api, event, Reply, message, usersData }) {
-    const threadID = event.threadID;
-    const messageID = event.messageID;
-    const senderName = await usersData.getName(event.senderID);
-    const replyText = event.body ? event.body.trim().toLowerCase() : "";
-
-    const sendTyping = async () => {
-      try {
-        if (typeof api.sendTypingIndicatorV2 === "function") {
-          await api.sendTypingIndicatorV2(true, threadID);
-          await new Promise(r => setTimeout(r, 3000));
-          await api.sendTypingIndicatorV2(false, threadID);
-        }
-      } catch (err) {
-        console.error("❌ Typing error:", err.message);
-      }
-    };
-
     try {
+      const senderName = await usersData.getName(event.senderID);
+      const replyText = event.body ? event.body.toLowerCase() : "";
       if (!replyText) return;
 
-      await sendTyping();
       const res = await axios.get(`${simsim}/simsimi?text=${encodeURIComponent(replyText)}&senderName=${encodeURIComponent(senderName)}`);
       const responses = Array.isArray(res.data.response) ? res.data.response : [res.data.response];
-
-      // যদি SimSimi কিছু না পায়, auto-teach করে
-      if (!responses || responses.length === 0) {
-        console.log(`🧠 Auto-teaching new reply: "${replyText}"`);
-        await axios.get(`${simsim}/teach?ask=${encodeURIComponent(replyText)}&ans=${encodeURIComponent("hmm baby 😚 (auto learned)")}&senderName=${encodeURIComponent(senderName)}`);
-        return message.reply("hmm baby 😚");
-      }
 
       for (const reply of responses) {
         await new Promise((resolve) => {
           message.reply(reply, (err, info) => {
             if (!err) {
-              global.GoatBot.onReply.set(info.messageID, { commandName: "baby", author: event.senderID });
+              global.GoatBot.onReply.set(info.messageID, {
+                commandName: "baby",
+                author: event.senderID
+              });
             }
             resolve();
           });
@@ -142,70 +124,129 @@ module.exports = {
       }
 
     } catch (err) {
-      console.error("❌ Baby reply error:", err);
+      console.error(err);
       message.reply(`Error in baby reply: ${err.message}`);
     }
   },
 
   // ─────────────── AUTO CHAT TRIGGER ───────────────
   onChat: async function ({ api, event, message, usersData }) {
-    const raw = event.body ? event.body.toLowerCase().trim() : "";
-    if (!raw) return;
-
-    const senderName = await usersData.getName(event.senderID);
-    const senderID = event.senderID;
-    const threadID = event.threadID;
-
-    const sendTyping = async () => {
-      try {
-        if (typeof api.sendTypingIndicatorV2 === "function") {
-          await api.sendTypingIndicatorV2(true, threadID);
-          await new Promise(r => setTimeout(r, 3000));
-          await api.sendTypingIndicatorV2(false, threadID);
-        }
-      } catch (err) {
-        console.error("❌ Typing error:", err.message);
-      }
-    };
-
     try {
-      const simpleTriggers = ["baby", "bot", "bby", "বেবি", "বট", "oi", "oii", "jan"];
-      if (simpleTriggers.includes(raw)) {
-        await sendTyping();
-        const replies = ["ডাকো কেন 🥺 প্রেম করবা নাকি 😞", "বুকাচুদা আর কত বট বট করবি 🐸", "ওই জান কাছে আসো 🫦👅", "আলাবু বলো সোনা 🤧", "আকাশ কে দেখছো? 🥺 তাকে কোথাও খুজে পাচ্ছি না 😩", "তুমার নুনুতে উম্মাহ 🥺🤌", "হ্যাঁ গো জান বলো 🙂", "ডাকিস না, তুই পচা 😼"];
-        const reply = replies[Math.floor(Math.random() * replies.length)];
-        return message.reply(reply, (err, info) => {
-          if (!err) global.GoatBot.onReply.set(info.messageID, { commandName: "baby", author: senderID });
+      const raw = event.body ? event.body.toLowerCase().trim() : "";
+      if (!raw) return;
+
+      const senderName = await usersData.getName(event.senderID);
+      const senderID = event.senderID;
+
+      // যদি শুধু “baby”, “bot” ইত্যাদি বলে
+      if (["baby", "bot", "bby", "jannu", "xan", "বেপি", "বট", "বেবি"].includes(raw)) {
+        const greetings = [
+          "বেশি bot Bot করলে leave নিবো কিন্তু😒😒",
+    "শুনবো না😼 তুমি আমার বস আশিক কে প্রেম করাই দাও নাই🥺পচা তুমি🥺",
+    "আমি আবাল দের সাথে কথা বলি না,ok😒",
+    "এতো ডেকো না,প্রেম এ পরে যাবো তো🙈",
+    "Bolo Babu, তুমি কি আমার বস আশিক  কে ভালোবাসো? 🙈💋",
+    "বার বার ডাকলে মাথা গরম হয়ে যায় কিন্তু😑",
+    "হ্যা বলো😒, তোমার জন্য কি করতে পারি😐😑?",
+    "এতো ডাকছিস কেন?গালি শুনবি নাকি? 🤬",
+    "I love you janu🥰",
+    "আরে Bolo আমার জান ,কেমন আছো?😚",
+    "আজ বট বলে অসম্মান করছি,😰😿",
+    "Hop beda😾,Boss বল boss😼",
+    "চুপ থাক ,নাই তো তোর দাত ভেগে দিবো কিন্তু",
+    "আমাকে না ডেকে মেয়ে হলে বস আশিক এর ইনবক্সে চলে যা 🌚😂 𝐅𝐚𝐜𝐞𝐛𝐨𝐨𝐤 𝐋𝐢𝐧𝐤 :https://www.facebook.com/ceoniamsimkm.2024 ",
+    "আমাকে বট না বলে , বস আশিক কে জানু বল জানু 😘",
+    "বার বার Disturb করছিস কোনো😾,আমার জানুর সাথে ব্যাস্ত আছি😋",
+    "আরে বলদ এতো ডাকিস কেন🤬",
+    "আমাকে ডাকলে ,আমি কিন্তু কিস করে দিবো😘",
+    "আমারে এতো ডাকিস না আমি মজা করার mood এ নাই এখন😒",
+    "হ্যাঁ জানু , এইদিক এ আসো কিস দেই🤭 😘",
+    "দূরে যা, তোর কোনো কাজ নাই, শুধু bot bot করিস 😉😋🤣",
+    "তোর কথা তোর বাড়ি কেউ শুনে না ,তো আমি কোনো শুনবো ?🤔😂",
+    "আমাকে ডেকো না,আমি বস আশিক এর সাথে ব্যাস্ত আছি",
+    "কি হলো , মিস্টেক করচ্ছিস নাকি🤣",
+    "বলো কি বলবা, সবার সামনে বলবা নাকি?🤭🤏",
+    "জান মেয়ে হলে বস আশিক ইনবক্সে চলে যাও 😍🫣💕 𝐅𝐚𝐜𝐞𝐛𝐨𝐨𝐤 𝐋𝐢𝐧𝐤 :https://www.facebook.com/ceoniamsimkm.2024 ",
+    "কালকে দেখা করিস তো একটু 😈",
+    "হা বলো, শুনছি আমি 😏",
+    "আর কত বার ডাকবি ,শুনছি তো",
+    "হুম বলো কি বলবে😒",
+    "বলো কি করতে পারি তোমার জন্য",
+    "আমি তো অন্ধ কিছু দেখি না🐸 😎",
+    "আরে বোকা বট না জানু বল জানু😌",
+    "বলো জানু 🌚",
+    "তোর কি চোখে পড়ে না আমি ব্যাস্ত আছি😒",
+    "হুম জান তোমার ওই খানে উম্মহ😑😘",
+    "আহ শুনা আমার তোমার অলিতে গলিতে উম্মাহ😇😘",
+    "jang hanga korba😒😬",
+    "হুম জান তোমার অইখানে উম্মমাহ😷😘",
+    "আসসালামু আলাইকুম বলেন আপনার জন্য কি করতে পারি..!🥰",
+    "ভালোবাসার নামক আবলামি করতে চাইলে বস আশিক এর ইনবক্সে গুতা দিন ~🙊😘🤣 𝐅𝐚𝐜𝐞𝐛𝐨𝐨𝐤 𝐋𝐢𝐧𝐤 :https://www.facebook.com/ceoniamsimkm.2024 ",
+    "আমাকে এতো না ডেকে বস আশিক এর কে একটা গফ দে 🙄",
+    "আমাকে এতো না ডেকছ কেন ভলো টালো বাসো নাকি🤭🙈",
+    "🌻🌺💚-আসসালামু আলাইকুম ওয়া রাহমাতুল্লাহ-💚🌺🌻",
+    "আমি এখন বস আশিক এর সাথে বিজি আছি আমাকে ডাকবেন না-😕😏 ধন্যবাদ-🤝🌻",
+    "আমাকে না ডেকে আমার বস আশিক কে একটা জি এফ দাও-😽🫶🌺",
+    "ঝাং থুমালে আইলাপিউ পেপি-💝😽",
+    "উফফ বুঝলাম না এতো ডাকছেন কেনো-😤😡😈",
+    "জান তোমার বান্ধবী রে আমার বস আশিক এর হাতে তুলে দিবা-🙊🙆‍♂",
+    "আজকে আমার মন ভালো নেই তাই আমারে ডাকবেন না-😪🤧",
+    "ঝাং 🫵থুমালে য়ামি রাইতে পালুপাসি উম্মম্মাহ-🌺🤤💦",
+    "চুনা ও চুনা আমার বস আশিক এর হবু বউ মাইশা'রে কেও দেকছো খুজে পাচ্ছি না😪🤧😭",
+    "স্বপ্ন তোমারে নিয়ে দেখতে চাই তুমি যদি আমার হয়ে থেকে যাও-💝🌺🌻",
+    "জান হাঙ্গা করবা-🙊😝🌻",
+    "তোদের জন্য একটুও শান্তি নাই! শুধু ডিস্টার্ব করিস 😿",    
+    "জান মেয়ে হলে চিপায় আসো বস  আশিক এর থেকে অনেক ভালোবাসা শিখছি তোমার জন্য-🙊🙈😽",
+    "ইসস এতো ডাকো কেনো লজ্জা লাগে তো-🙈🖤🌼",
+    "আমার বস   আশিক এর পক্ষ থেকে তোমারে এতো এতো ভালোবাসা-🥰😽🫶 আমার বস  আশিক হাসানে'র জন্য দোয়া করবেন-💝💚🌺🌻",
+    "- ভালোবাসা নামক আব্লামি করতে মন চাইলে আমার আশিক এর ইনবক্স চলে যাও-🙊🥱👅 🌻𝐅𝐀𝐂𝐄𝐁𝐎𝐎𝐊 𝐈𝐃 𝐋𝐈𝐍𝐊 🌻:- https://www.facebook.com/ceoniamsimkm.2024 ",
+    "আমার জান তুমি শুধু আমার আমি তোমারে ৩৬৫ দিন ভালোবাসি-💝🌺😽",
+    "কিরে প্রেম করবি তাহলে বস আশিক এর ইনবক্সে গুতা দে 😘🤌 𝐅𝐚𝐜𝐞𝐛𝐨𝐨𝐤 𝐋𝐢𝐧𝐤 : https:. ",
+    "জান আমার বস আশিক কে বিয়ে করবা-🙊😘🥳",
+    // ... এভাবে পুরো লিস্টে সব লিঙ্কই এখন https://www.facebook.com/profile.php?id=61581873324266
+];https://www.facebook.com/ceoniamsimkm.2024
+
+        const randomReply = greetings[Math.floor(Math.random() * greetings.length)];
+        message.reply({
+          body: `@${senderName} ${randomReply}`,
+          mentions: [{ tag: `@${senderName}`, id: senderID }]
+        }, (err, info) => {
+          if (!err) {
+            global.GoatBot.onReply.set(info.messageID, {
+              commandName: "baby",
+              author: senderID
+            });
+          }
         });
       }
 
-      // যদি “baby [text]” হয়
-      const prefixes = ["baby ", "bot ", "বেবি ", "বট ", "jan"];
-      const prefix = prefixes.find(p => raw.startsWith(p));
-      if (prefix) {
-        const query = raw.replace(prefix, "").trim();
+      // যদি baby + query হয়
+      const prefixes = ["baby ", "bot ", "bby ", "jannu ", "xan ", "বেপি ", "বট ", "বেবি "];
+      const prefixMatch = prefixes.find(p => raw.startsWith(p));
+      if (prefixMatch) {
+        const query = raw.replace(prefixMatch, "").trim();
         if (!query) return;
-        await sendTyping();
+
         const res = await axios.get(`${simsim}/simsimi?text=${encodeURIComponent(query)}&senderName=${encodeURIComponent(senderName)}`);
         const responses = Array.isArray(res.data.response) ? res.data.response : [res.data.response];
-
-        if (!responses || responses.length === 0) {
-          console.log(`🧠 Auto-learned: "${query}"`);
-          await axios.get(`${simsim}/teach?ask=${encodeURIComponent(query)}&ans=${encodeURIComponent("hmm baby 😚 (auto learned)")}&senderName=${encodeURIComponent(senderName)}`);
-          return message.reply("hmm baby 😚");
-        }
 
         for (const reply of responses) {
           await new Promise((resolve) => {
             message.reply(reply, (err, info) => {
-              if (!err) global.GoatBot.onReply.set(info.messageID, { commandName: "baby", author: senderID });
+              if (!err) {
+                global.GoatBot.onReply.set(info.messageID, {
+                  commandName: "baby",
+                  author: senderID
+                });
+              }
               resolve();
             });
           });
         }
       }
+
     } catch (err) {
-      console.error("❌ Baby onChat error:", err);
+      console.error(err);
     }
   }
 };
