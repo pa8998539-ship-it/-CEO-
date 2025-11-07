@@ -12,15 +12,15 @@
   "antiInbox": false,
   "language": "en",
   "notesLanguage": "change language using ISO 639-1 code",
-  "nickNameBot": "♡┋Տʜɪᴢᴜᴋꫝㅤᥫ᭡",
+  "nickNameBot": "〲CEO ニ আ্ঁশি্ঁক্ঁ࿐",
   "prefix": "/",
   "adminOnly": {
     "enable": false,
     "ignoreCommand": []
   },
   "adminBot": [
-    "100078049308655",
-    "61577213967981"
+    "100087149917993",
+    "61567292322579"
   ],
   "reactUnsend": {
     "enable": true,
